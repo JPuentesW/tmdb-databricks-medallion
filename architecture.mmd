@@ -1,46 +1,41 @@
 flowchart TB
-  %% =====================
-  %% TMDB Medallion Pipeline
-  %% =====================
-
-  subgraph TMDB[TMDB API]
-    A1[/GET /genre/movie/list/]
-    A2[/GET /discover/movie\n(with_genres, page)/]
+  subgraph TMDB["TMDB API"]
+    A1["GET /genre/movie/list"]
+    A2["GET /discover/movie <br/> params: with_genres, page"]
   end
 
-  subgraph BRONZE[Bronze (Raw JSON) - Unity Catalog Volume]
+  subgraph BRONZE["Bronze (Raw JSON) - Unity Catalog Volume"]
     B0["/Volumes/tmdb/default/bronze_tmdb"]
-    B1["/genres/\ngenres_YYYY-MM-DD.json"]
-    B2["/discover/\ndiscover_genre_<gid>_page_<n>_YYYY-MM-DD.json"]
+    B1["/genres/ <br/> genres_YYYY-MM-DD.json"]
+    B2["/discover/ <br/> discover_genre_<gid>_page_<n>_YYYY-MM-DD.json"]
   end
 
-  subgraph SILVER[Silver (Curated Delta Tables) - Unity Catalog]
-    S1[(tmdb.default.silver_genres\nPK: genre_id)]
-    S2[(tmdb.default.silver_movies\nPK: movie_id)]
-    S3[(tmdb.default.silver_movie_genres\nFK: movie_id -> silver_movies\nFK: genre_id -> silver_genres)]
+  subgraph SILVER["Silver (Curated Delta Tables) - Unity Catalog"]
+    S1["tmdb.default.silver_genres <br/> PK: genre_id"]
+    S2["tmdb.default.silver_movies <br/> PK: movie_id"]
+    S3["tmdb.default.silver_movie_genres <br/> FK: movie_id -> silver_movies <br/> FK: genre_id -> silver_genres"]
   end
 
-  subgraph GOLD[Gold (Analytics Delta Tables) - Unity Catalog]
-    G1[(tmdb.default.gold_genre_score\nweighted_rating + total_votes)]
-    G2[(tmdb.default.gold_top_movies_best_genre\nTop N películas del mejor género)]
-    G3[(tmdb.default.gold_top_movies_by_genre\nTop N por cada género)]
+  subgraph GOLD["Gold (Analytics Delta Tables) - Unity Catalog"]
+    G1["tmdb.default.gold_genre_score <br/> weighted_rating + total_votes"]
+    G2["tmdb.default.gold_top_movies_best_genre <br/> Top N del mejor género"]
+    G3["tmdb.default.gold_top_movies_by_genre <br/> Top N por género"]
   end
 
-  %% ===== Flows =====
-  A1 -->|bronze ingest| B1
-  A2 -->|bronze ingest| B2
-  B1 -->|parse + normalize| S1
-  B2 -->|explode results + cast types| S2
-  B2 -->|map movie_id -> genre_id| S3
+  A1 -->|"bronze ingest"| B1
+  A2 -->|"bronze ingest"| B2
 
-  %% ===== Gold transformations =====
-  S1 -->|join| G1
-  S2 -->|agg| G1
-  S3 -->|join bridge| G1
+  B1 -->|"parse + normalize"| S1
+  B2 -->|"explode results + cast types"| S2
+  B2 -->|"map movie_id -> genre_id"| S3
 
-  G1 -->|pick best genre| G2
-  S2 -->|filter + rank| G2
+  S1 -->|"join"| G1
+  S2 -->|"agg"| G1
+  S3 -->|"join bridge"| G1
 
-  S1 -->|genre names| G3
-  S2 -->|rank per genre| G3
-  S3 -->|bridge join| G3
+  G1 -->|"pick best genre"| G2
+  S2 -->|"filter + rank"| G2
+
+  S1 -->|"genre names"| G3
+  S2 -->|"rank per genre"| G3
+  S3 -->|"bridge join"| G3
